@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 
 import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -24,13 +25,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Badge,
 } from '@/components/ui'
+import { updateProductCosting, useProductCostings } from '@/features/product-costing'
 import { usePurchaseOrders } from '@/features/purchase-orders'
-import { createProductCosting, useProductCostings } from '@/features/product-costing'
 import { useRawMaterials } from '@/features/raw-materials'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
-import { useRouterState } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { formatDisplayAmount } from '@/lib/displayAmount'
 import { zNonNegativeInput } from '@/lib/formZod'
 import { todayLocalISODate } from '@/lib/localDate'
@@ -56,11 +56,24 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function ProductCostingNewPage() {
+function getIdFromPath(pathname: string) {
+  const m = pathname.match(/\/dashboard\/product-costing\/([^/]+)\/edit\/?$/)
+  return m?.[1] ?? ''
+}
+
+export function ProductCostingEditPage() {
   const location = useRouterState({ select: (s) => s.location })
+  const productCostingId = useMemo(() => getIdFromPath(location.pathname), [location.pathname])
+
   const { items: rawMaterials, loading: materialsLoading } = useRawMaterials()
   const { items: purchaseOrders, loading: poLoading } = usePurchaseOrders()
   const { items: productCostings, loading: pcLoading } = useProductCostings()
+
+  const pc = useMemo(
+    () => productCostings.find((x) => x.id === productCostingId) ?? null,
+    [productCostingId, productCostings],
+  )
+
   const [saving, setSaving] = useState(false)
 
   const resolver = zodResolver(schema) as unknown as Resolver<FormValues>
@@ -82,29 +95,26 @@ export function ProductCostingNewPage() {
   })
 
   useEffect(() => {
-    const fromId = new URLSearchParams(location.search ?? '').get('from') ?? ''
-    if (!fromId) return
-    const src = productCostings.find((x) => x.id === fromId)
-    if (!src) return
+    if (!pc) return
     form.reset({
-      costingDate: todayLocalISODate(),
-      productName: src.productName ?? '',
-      weightPerPiece: Number(src.weightPerPiece ?? 0),
-      production: Number(src.production ?? 0),
-      produced: Number(src.produced ?? 0),
-      emptyTin: Number(src.emptyTin ?? 0),
-      cartonTape: Number(src.cartonTape ?? 0),
-      labour: Number(src.labour ?? 0),
+      costingDate: pc.costingDate || todayLocalISODate(),
+      productName: pc.productName ?? '',
+      weightPerPiece: Number(pc.weightPerPiece ?? 0),
+      production: Number(pc.production ?? 0),
+      produced: Number(pc.produced ?? 0),
+      emptyTin: Number(pc.emptyTin ?? 0),
+      cartonTape: Number(pc.cartonTape ?? 0),
+      labour: Number(pc.labour ?? 0),
       lines:
-        src.lines?.length
-          ? src.lines.map((l) => ({
+        pc.lines?.length
+          ? pc.lines.map((l) => ({
               rawMaterialId: l.rawMaterialId ?? '',
               qty: Number(l.qty ?? 0),
               rate: Number(l.rate ?? 0),
             }))
           : [{ rawMaterialId: '', qty: 0, rate: 0 }],
     })
-  }, [form, location.search, productCostings])
+  }, [form, pc])
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -134,8 +144,9 @@ export function ProductCostingNewPage() {
     }
 
     const used = new Map<string, number>()
-    for (const pc of productCostings) {
-      for (const ln of pc.lines ?? []) {
+    for (const other of productCostings) {
+      if (other.id === productCostingId) continue
+      for (const ln of other.lines ?? []) {
         const id = (ln as { rawMaterialId?: string }).rawMaterialId ?? ''
         if (!id) continue
         const qty = Number((ln as { qty?: number }).qty ?? 0)
@@ -144,54 +155,29 @@ export function ProductCostingNewPage() {
       }
     }
 
-    const out = new Map<string, { availableQty: number; avgRate: number; usedQty: number; purchasedQty: number }>()
+    const out = new Map<string, { availableQty: number; avgRate: number }>()
     for (const [id, v] of purchased) {
       const usedQty = used.get(id) ?? 0
-      const availableQty = Math.max(0, v.qty - usedQty)
-      out.set(id, {
-        purchasedQty: v.qty,
-        usedQty,
-        availableQty,
-        avgRate: v.qty > 0 ? v.amount / v.qty : 0,
-      })
+      out.set(id, { availableQty: Math.max(0, v.qty - usedQty), avgRate: v.qty > 0 ? v.amount / v.qty : 0 })
     }
     return out
-  }, [productCostings, purchaseOrders])
+  }, [productCostings, productCostingId, purchaseOrders])
 
   const computed = useMemo(() => {
-    const linesInput = watchLines ?? []
-
-    const reservedById = new Map<string, number>()
-    for (const ln of linesInput) {
-      const id = (ln as { rawMaterialId?: string }).rawMaterialId ?? ''
-      if (!id) continue
-      const qty = Number((ln as { qty?: unknown }).qty ?? 0)
-      if (!Number.isFinite(qty) || qty <= 0) continue
-      reservedById.set(id, (reservedById.get(id) ?? 0) + qty)
-    }
-
-    const lines = linesInput.map((ln) => {
+    const lines = (watchLines ?? []).map((ln) => {
       const qty = Number(ln.qty || 0)
       const rate = Number(ln.rate || 0)
       const amount = qty * rate
       const rm = rawMaterials.find((r) => r.id === ln.rawMaterialId)
       const stats = materialStatsById.get(ln.rawMaterialId) ?? { availableQty: 0, avgRate: 0 }
-
-      const id = ln.rawMaterialId
-      const reservedTotal = id ? (reservedById.get(id) ?? 0) : 0
-      const reservedOther = Math.max(0, reservedTotal - (Number.isFinite(qty) ? qty : 0))
-      const effectiveAvailable = Math.max(0, Number(stats.availableQty || 0) - reservedOther)
-
       return {
         rawMaterialId: ln.rawMaterialId,
         rawMaterialName: rm?.name ?? '',
         qty,
         rate,
         amount,
-        availableQty: effectiveAvailable,
+        availableQty: stats.availableQty,
         suggestedRate: stats.avgRate,
-        _capBase: stats.availableQty,
-        _reservedOther: reservedOther,
       }
     })
 
@@ -214,15 +200,7 @@ export function ProductCostingNewPage() {
       otherPerPiece,
       finalCostPerPiece,
     }
-  }, [
-    materialStatsById,
-    cartonTape,
-    emptyTin,
-    labour,
-    weightPerPiece,
-    rawMaterials,
-    watchLines,
-  ])
+  }, [cartonTape, emptyTin, labour, materialStatsById, rawMaterials, watchLines, weightPerPiece])
 
   useEffect(() => {
     form.setValue('production', computed.productionAuto, { shouldValidate: true })
@@ -238,9 +216,10 @@ export function ProductCostingNewPage() {
   }
 
   async function onSubmit(values: FormValues) {
+    if (!productCostingId) return
     setSaving(true)
     try {
-      await createProductCosting({
+      await updateProductCosting(productCostingId, {
         costingDate: values.costingDate,
         productName: values.productName,
         weightPerPiece: Number(values.weightPerPiece || 0),
@@ -260,19 +239,7 @@ export function ProductCostingNewPage() {
         totalCost: computed.finalCostPerPiece,
         costPerPiece: computed.materialCostPerPiece,
       })
-
-      form.reset({
-        costingDate: todayLocalISODate(),
-        productName: '',
-        weightPerPiece: 0,
-        production: 0,
-        produced: 0,
-        emptyTin: 0,
-        cartonTape: 0,
-        labour: 0,
-        lines: [{ rawMaterialId: '', qty: 0, rate: 0 }],
-      })
-      toast.success('Product costing saved.')
+      toast.success('Product updated.')
     } finally {
       setSaving(false)
     }
@@ -291,22 +258,41 @@ export function ProductCostingNewPage() {
 
   return (
     <PageShell
-      title="Create Product"
-      description="Select raw materials, enter qty, and use the suggested average rate (editable). Totals recalculate automatically."
+      title="Edit Product"
+      description="Update product details and raw materials. Totals recalculate automatically."
       actions={
-        <Button type="submit" form="pc-form" disabled={!form.formState.isValid || saving || loading}>
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving…
-            </>
-          ) : (
-            'Save Product'
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link to="/dashboard/product-costing">Back to list</Link>
+          </Button>
+          <Button type="submit" form="pc-edit-form" disabled={!form.formState.isValid || saving || loading}>
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              'Save changes'
+            )}
+          </Button>
+        </div>
       }
     >
-      <form id="pc-form" className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+      {!productCostingId ? (
+        <div className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-red-600">
+          Invalid product.
+        </div>
+      ) : null}
+
+      {!pc && productCostingId ? (
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : null}
+
+      <form id="pc-edit-form" className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
         <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle>Product details</CardTitle>
@@ -392,7 +378,7 @@ export function ProductCostingNewPage() {
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle>Raw materials</CardTitle>
-              <CardDescription>Average rate is suggested from purchase orders.</CardDescription>
+              <CardDescription>Qty cannot exceed available stock.</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -456,14 +442,10 @@ export function ProductCostingNewPage() {
                                       <Input
                                         type="number"
                                         min={0}
-                                        max={Number(line?._capBase || 0)}
+                                        max={Number(line?.availableQty || 0)}
                                         step="0.0001"
-                                        placeholder="—"
                                         value={
-                                          (field.value as unknown) === '' ||
-                                          field.value === null ||
-                                          field.value === undefined ||
-                                          Number(field.value) === 0
+                                          (field.value as unknown) === '' || field.value === null || field.value === undefined
                                             ? ''
                                             : field.value
                                         }
@@ -475,14 +457,11 @@ export function ProductCostingNewPage() {
 
                                           const next = Number(e.target.value)
                                           const cap = Number(line?.availableQty || 0)
-                                          const clamped = Math.max(
-                                            0,
-                                            Math.min(
-                                              Number.isFinite(cap) ? cap : 0,
-                                              Number.isFinite(next) ? next : 0,
-                                            ),
-                                          )
+                                          const clamped = Math.max(0, Math.min(Number.isFinite(cap) ? cap : 0, Number.isFinite(next) ? next : 0))
                                           field.onChange(clamped)
+                                        }}
+                                        onBlur={() => {
+                                          if ((field.value as unknown) === '') field.onChange(0)
                                         }}
                                       />
                                     )}
@@ -494,26 +473,10 @@ export function ProductCostingNewPage() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="w-[110px]">
-                                  <Controller
-                                    control={form.control}
-                                    name={`lines.${idx}.rate`}
-                                    render={({ field }) => (
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        step="0.0001"
-                                        placeholder="—"
-                                        value={field.value === 0 ? '' : field.value}
-                                        onChange={(e) => {
-                                          const v = e.target.value
-                                          field.onChange(v === '' ? 0 : Number(v))
-                                        }}
-                                      />
-                                    )}
-                                  />
+                                  <Input type="number" min={0} step="0.0001" {...form.register(`lines.${idx}.rate`)} />
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
-                                  {formatDisplayAmount(Number.isFinite(line?.amount) ? line.amount : 0)}
+                                  {money.format(Number.isFinite(line?.amount) ? line.amount : 0)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button
@@ -533,11 +496,11 @@ export function ProductCostingNewPage() {
                           })}
                           <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
                             <TableCell>Total</TableCell>
-                            <TableCell className="tabular-nums">{formatDisplayAmount(computed.totalQty)}</TableCell>
+                            <TableCell className="tabular-nums">{qtyTotalFmt.format(computed.totalQty)}</TableCell>
                             <TableCell />
                             <TableCell />
                             <TableCell className="text-right tabular-nums">
-                              {formatDisplayAmount(computed.totalRawMaterialCost)}
+                              {money.format(computed.totalRawMaterialCost)}
                             </TableCell>
                             <TableCell />
                           </TableRow>
@@ -567,63 +530,15 @@ export function ProductCostingNewPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Empty tin</Label>
-                    <Controller
-                      control={form.control}
-                      name="emptyTin"
-                      render={({ field }) => (
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.0001"
-                          placeholder="—"
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            field.onChange(v === '' ? 0 : Number(v))
-                          }}
-                        />
-                      )}
-                    />
+                    <Input type="number" min={0} step="0.0001" {...form.register('emptyTin')} />
                   </div>
                   <div className="space-y-2">
                     <Label>Carton + tape</Label>
-                    <Controller
-                      control={form.control}
-                      name="cartonTape"
-                      render={({ field }) => (
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.0001"
-                          placeholder="—"
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            field.onChange(v === '' ? 0 : Number(v))
-                          }}
-                        />
-                      )}
-                    />
+                    <Input type="number" min={0} step="0.0001" {...form.register('cartonTape')} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Labour</Label>
-                    <Controller
-                      control={form.control}
-                      name="labour"
-                      render={({ field }) => (
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.0001"
-                          placeholder="—"
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            field.onChange(v === '' ? 0 : Number(v))
-                          }}
-                        />
-                      )}
-                    />
+                    <Input type="number" min={0} step="0.0001" {...form.register('labour')} />
                   </div>
                 </div>
               </CardContent>
@@ -667,16 +582,16 @@ export function ProductCostingNewPage() {
                     <div className="my-2 h-px bg-border" />
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-muted-foreground">Cost per piece</div>
-                      <div className="tabular-nums font-medium">{formatDisplayAmount(computed.materialCostPerPiece)}</div>
+                      <div className="tabular-nums font-medium">{money.format(computed.materialCostPerPiece)}</div>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-muted-foreground">Tin, packing, labour</div>
-                      <div className="tabular-nums font-medium">{formatDisplayAmount(computed.otherPerPiece)}</div>
+                      <div className="tabular-nums font-medium">{money.format(computed.otherPerPiece)}</div>
                     </div>
                     <div className="my-2 h-px bg-border" />
                     <div className="flex items-center justify-between gap-x-4 gap-y-1">
                       <div className="text-base font-semibold">Total cost</div>
-                      <div className="text-base font-semibold tabular-nums">{formatDisplayAmount(computed.finalCostPerPiece)}</div>
+                      <div className="text-base font-semibold tabular-nums">{money.format(computed.finalCostPerPiece)}</div>
                     </div>
                   </div>
                 </div>

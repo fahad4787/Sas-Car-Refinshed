@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onWheel, ...props }, ref) => {
     return (
       <input
         ref={ref}
@@ -17,6 +17,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             : '',
           className,
         )}
+        onWheel={
+          type === 'number'
+            ? (e) => {
+                e.currentTarget.blur()
+                onWheel?.(e)
+              }
+            : onWheel
+        }
         {...props}
       />
     )

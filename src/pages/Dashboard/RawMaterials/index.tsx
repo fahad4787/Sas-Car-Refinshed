@@ -46,6 +46,7 @@ import {
   useRawMaterials,
 } from '@/features/raw-materials'
 import { usePurchaseOrders } from '@/features/purchase-orders'
+import { useProductCostings } from '@/features/product-costing'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 
 const schema = z.object({
@@ -59,6 +60,7 @@ type FormValues = z.infer<typeof schema>
 export function RawMaterialPage() {
   const { items, latest, loading, error } = useRawMaterials()
   const { items: purchaseOrders, loading: poLoading } = usePurchaseOrders()
+  const { items: productCostings, loading: pcLoading } = useProductCostings()
   const [query, setQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [upsertOpen, setUpsertOpen] = useState(false)
@@ -93,7 +95,7 @@ export function RawMaterialPage() {
   }, [items, query])
 
   const materialStatsById = useMemo(() => {
-    const map = new Map<string, { qty: number; amount: number }>()
+    const purchased = new Map<string, { qty: number; amount: number }>()
     for (const po of purchaseOrders) {
       for (const it of po.items ?? []) {
         const id = (it as { rawMaterialId?: string }).rawMaterialId ?? ''
@@ -101,19 +103,37 @@ export function RawMaterialPage() {
         const qty = Number((it as { qty?: number }).qty ?? 0)
         const amount = Number((it as { amount?: number }).amount ?? 0)
         if (!Number.isFinite(qty) || qty <= 0) continue
-        const cur = map.get(id) ?? { qty: 0, amount: 0 }
+        const cur = purchased.get(id) ?? { qty: 0, amount: 0 }
         cur.qty += qty
         cur.amount += Number.isFinite(amount) ? amount : qty * Number((it as { rate?: number }).rate ?? 0)
-        map.set(id, cur)
+        purchased.set(id, cur)
       }
     }
 
-    const out = new Map<string, { availableQty: number; avgRate: number }>()
-    for (const [id, v] of map) {
-      out.set(id, { availableQty: v.qty, avgRate: v.qty > 0 ? v.amount / v.qty : 0 })
+    const used = new Map<string, number>()
+    for (const pc of productCostings) {
+      for (const ln of pc.lines ?? []) {
+        const id = (ln as { rawMaterialId?: string }).rawMaterialId ?? ''
+        if (!id) continue
+        const qty = Number((ln as { qty?: number }).qty ?? 0)
+        if (!Number.isFinite(qty) || qty <= 0) continue
+        used.set(id, (used.get(id) ?? 0) + qty)
+      }
+    }
+
+    const out = new Map<string, { availableQty: number; avgRate: number; usedQty: number; purchasedQty: number }>()
+    for (const [id, v] of purchased) {
+      const usedQty = used.get(id) ?? 0
+      const availableQty = Math.max(0, v.qty - usedQty)
+      out.set(id, {
+        purchasedQty: v.qty,
+        usedQty,
+        availableQty,
+        avgRate: v.qty > 0 ? v.amount / v.qty : 0,
+      })
     }
     return out
-  }, [purchaseOrders])
+  }, [productCostings, purchaseOrders])
 
   const money = useMemo(
     () =>
@@ -222,9 +242,9 @@ export function RawMaterialPage() {
         </CardHeader>
         <CardContent>
           <DataTable
-            isEmpty={loading || poLoading || filtered.length === 0}
+            isEmpty={loading || poLoading || pcLoading || filtered.length === 0}
             empty={
-              loading || poLoading ? (
+              loading || poLoading || pcLoading ? (
                 <div className="space-y-3">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />

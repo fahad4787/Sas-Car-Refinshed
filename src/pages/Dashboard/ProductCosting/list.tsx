@@ -24,7 +24,7 @@ import {
 import { removeProductCosting, useProductCostings } from '@/features/product-costing'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, ChevronUp, MoreVertical, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function ProductCostingsListPage() {
@@ -147,11 +147,20 @@ export function ProductCostingsListPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
+                                <Link
+                                  to="/dashboard/product-costing/$productCostingId/edit"
+                                  params={{ productCostingId: pc.id }}
+                                >
+                                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                                  Edit
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
                                 <Link to="/dashboard/product-costing/new" search={{ from: pc.id }}>
                                   Duplicate
                                 </Link>
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-primary" onSelect={() => setDeletingId(pc.id)}>
                                 <Trash2 className="h-4 w-4" />
                                 Delete

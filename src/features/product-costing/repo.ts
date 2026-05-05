@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore'
 
 import { db } from '@/lib/firebase'
@@ -37,6 +38,15 @@ export async function createProductCosting(docInput: Omit<ProductCostingDoc, 'cr
   await addDoc(productCostingsCollection, {
     ...docInput,
     createdAt: serverTimestamp(),
+  })
+}
+
+export async function updateProductCosting(
+  id: string,
+  docInput: Omit<ProductCostingDoc, 'createdAt'>,
+) {
+  await updateDoc(doc(productCostingsCollection, id), {
+    ...docInput,
   })
 }
 

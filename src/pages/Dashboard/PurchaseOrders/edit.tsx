@@ -10,19 +10,21 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Date
 import { updatePurchaseOrder, usePurchaseOrders } from '@/features/purchase-orders'
 import { useRawMaterials } from '@/features/raw-materials'
 import { useSuppliers } from '@/features/suppliers'
+import { formatDisplayAmount } from '@/lib/displayAmount'
+import { zNonNegativeInput, zPositiveQtyInput, zVatPercentInput } from '@/lib/formZod'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 import { Link, useRouterState } from '@tanstack/react-router'
 
 const itemSchema = z.object({
   rawMaterialId: z.string().min(1, 'Select an item'),
-  qty: z.coerce.number().positive('Qty (Kg) is required'),
-  rate: z.coerce.number().nonnegative('Rate is required'),
+  qty: zPositiveQtyInput,
+  rate: zNonNegativeInput,
 })
 
 const schema = z.object({
   purchaseDate: z.string().min(1, 'Select date'),
   supplierId: z.string().min(1, 'Select supplier'),
-  vatPercent: z.coerce.number().min(0).max(100),
+  vatPercent: zVatPercentInput,
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 })
 
@@ -55,8 +57,10 @@ export function PurchaseOrderEditPage() {
     defaultValues: {
       purchaseDate: new Date().toISOString().slice(0, 10),
       supplierId: '',
-      vatPercent: 0,
-      items: [{ rawMaterialId: '', qty: 1, rate: 0 }],
+      vatPercent: undefined as unknown as number,
+      items: [
+        { rawMaterialId: '', qty: undefined as unknown as number, rate: undefined as unknown as number },
+      ],
     },
     mode: 'onChange',
   })
@@ -73,10 +77,16 @@ export function PurchaseOrderEditPage() {
         po.items?.length
           ? po.items.map((it) => ({
               rawMaterialId: it.rawMaterialId ?? '',
-              qty: Number(it.qty ?? 0) || 1,
-              rate: Number(it.rate ?? 0) || 0,
+              qty: Number(it.qty ?? 0),
+              rate: Number(it.rate ?? 0),
             }))
-          : [{ rawMaterialId: '', qty: 1, rate: 0 }],
+          : [
+              {
+                rawMaterialId: '',
+                qty: undefined as unknown as number,
+                rate: undefined as unknown as number,
+              },
+            ],
     })
   }, [form, po])
 
@@ -93,15 +103,6 @@ export function PurchaseOrderEditPage() {
   const supplier = useMemo(
     () => suppliers.find((s) => s.id === supplierId) ?? null,
     [supplierId, suppliers],
-  )
-
-  const money = useMemo(
-    () =>
-      new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    [],
   )
 
   const computed = useMemo(() => {
@@ -243,7 +244,24 @@ export function PurchaseOrderEditPage() {
               </div>
               <div className="space-y-2 md:col-span-1">
                 <Label>VAT %</Label>
-                <Input type="number" min={0} max={100} step="0.01" {...form.register('vatPercent')} />
+                <Controller
+                  control={form.control}
+                  name="vatPercent"
+                  render={({ field }) => (
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      placeholder="—"
+                      value={field.value === 0 || field.value === undefined ? '' : field.value}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        field.onChange(v === '' ? 0 : Number(v))
+                      }}
+                    />
+                  )}
+                />
               </div>
             </div>
           </CardContent>
@@ -307,16 +325,48 @@ export function PurchaseOrderEditPage() {
                                   ) : null}
                                 </TableCell>
                                 <TableCell className="min-w-[130px]">
-                                  <Input type="number" min={0} step="0.01" {...form.register(`items.${idx}.qty`)} />
+                                  <Controller
+                                    control={form.control}
+                                    name={`items.${idx}.qty`}
+                                    render={({ field }) => (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="—"
+                                        value={field.value == null || field.value === '' ? '' : field.value}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          field.onChange(v === '' ? (undefined as unknown as number) : Number(v))
+                                        }}
+                                      />
+                                    )}
+                                  />
                                 </TableCell>
                               <TableCell className="whitespace-nowrap text-sm">
                                 {rawMaterials.find((r) => r.id === computed.items[idx]?.rawMaterialId)?.unit || '—'}
                               </TableCell>
                                 <TableCell className="min-w-[160px]">
-                                  <Input type="number" min={0} step="0.01" {...form.register(`items.${idx}.rate`)} />
+                                  <Controller
+                                    control={form.control}
+                                    name={`items.${idx}.rate`}
+                                    render={({ field }) => (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="—"
+                                        value={field.value === 0 || field.value === undefined ? '' : field.value}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          field.onChange(v === '' ? 0 : Number(v))
+                                        }}
+                                      />
+                                    )}
+                                  />
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
-                                  {money.format(Number.isFinite(line?.amount) ? line.amount : 0)}
+                                  {formatDisplayAmount(Number.isFinite(line?.amount) ? line.amount : 0)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button
@@ -340,7 +390,17 @@ export function PurchaseOrderEditPage() {
                   </div>
 
                   <div className="mt-4 flex items-center justify-between">
-                    <Button type="button" variant="outline" onClick={() => append({ rawMaterialId: '', qty: 1, rate: 0 })}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        append({
+                          rawMaterialId: '',
+                          qty: undefined as unknown as number,
+                          rate: undefined as unknown as number,
+                        })
+                      }
+                    >
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Add another item
                     </Button>
@@ -364,16 +424,16 @@ export function PurchaseOrderEditPage() {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-muted-foreground">Subtotal</div>
-                    <div className="tabular-nums font-semibold">{money.format(computed.totalAmount)}</div>
+                    <div className="tabular-nums font-semibold">{formatDisplayAmount(computed.totalAmount)}</div>
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-muted-foreground">VAT ({Number(vatPercent || 0)}%)</div>
-                    <div className="tabular-nums font-semibold">{money.format(computed.vatAmount)}</div>
+                    <div className="tabular-nums font-semibold">{formatDisplayAmount(computed.vatAmount)}</div>
                   </div>
                   <div className="mt-3 h-px bg-border" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-base font-semibold">Gross</div>
-                    <div className="tabular-nums text-base font-semibold">{money.format(computed.grossAmount)}</div>
+                    <div className="tabular-nums text-base font-semibold">{formatDisplayAmount(computed.grossAmount)}</div>
                   </div>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { RawMaterialPage } from '@/pages/Dashboard/RawMaterials'
 import { PurchaseOrderEditPage, PurchaseOrderPage, PurchaseOrdersListPage } from '@/pages/Dashboard/PurchaseOrders'
 import { ProductCostingsListPage } from '@/pages/Dashboard/ProductCosting/list'
 import { ProductCostingNewPage } from '@/pages/Dashboard/ProductCosting/new'
+import { ProductCostingEditPage } from '@/pages/Dashboard/ProductCosting/edit'
 import { PlaceholderPage } from '@/pages/Dashboard/_components/PlaceholderPage'
 
 const rootRoute = new RootRoute({
@@ -79,6 +80,12 @@ const productCostingNewRoute = new Route({
   component: ProductCostingNewPage,
 })
 
+const productCostingEditRoute = new Route({
+  getParentRoute: () => dashboardRoute,
+  path: '/product-costing/$productCostingId/edit',
+  component: ProductCostingEditPage,
+})
+
 const stockReportRoute = new Route({
   getParentRoute: () => dashboardRoute,
   path: '/stock-report',
@@ -114,6 +121,7 @@ const routeTree = rootRoute.addChildren([
     purchaseOrderEditRoute,
     productCostingRoute,
     productCostingNewRoute,
+    productCostingEditRoute,
     stockReportRoute,
     customersRoute,
     posRoute,
