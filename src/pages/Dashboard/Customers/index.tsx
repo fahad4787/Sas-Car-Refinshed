@@ -13,12 +13,12 @@ import {
   CardHeader,
   CardTitle,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogBody,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,39 +34,39 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui'
-import type { Supplier } from '@/features/suppliers'
-import { createSupplier, removeSupplier, updateSupplier, useSuppliers } from '@/features/suppliers'
+import type { Customer } from '@/features/customers'
+import { createCustomer, removeCustomer, updateCustomer, useCustomers } from '@/features/customers'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 
-const supplierSchema = z.object({
-  customerCode: z.string().trim().min(1, 'Company code is required'),
-  companyName: z.string().trim().min(2, 'Company name is required'),
-  contact: z.string().trim().min(3, 'Contact is required'),
+const schema = z.object({
+  name: z.string().trim().min(2, 'Customer name is required'),
+  phone: z.string().trim().min(7, 'Phone number is required'),
+  email: z.string().trim().email('Valid email is required'),
 })
 
-type SupplierFormValues = z.infer<typeof supplierSchema>
+type FormValues = z.infer<typeof schema>
 
-export function SupplierPage() {
-  const { items, latest, loading, error } = useSuppliers()
+export function CustomerPage() {
+  const { items, latest, loading, error } = useCustomers()
   const [query, setQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [upsertOpen, setUpsertOpen] = useState(false)
-  const [editing, setEditing] = useState<Supplier | null>(null)
-  const [deleting, setDeleting] = useState<Supplier | null>(null)
+  const [editing, setEditing] = useState<Customer | null>(null)
+  const [deleting, setDeleting] = useState<Customer | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
 
-  const form = useForm<SupplierFormValues>({
-    resolver: zodResolver(supplierSchema),
-    defaultValues: { customerCode: '', companyName: '', contact: '' },
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', phone: '', email: '' },
     mode: 'onChange',
   })
 
   useEffect(() => {
     if (!upsertOpen) return
     form.reset({
-      customerCode: editing?.customerCode ?? '',
-      companyName: editing?.companyName ?? '',
-      contact: editing?.contact ?? '',
+      name: editing?.name ?? '',
+      phone: editing?.phone ?? '',
+      email: editing?.email ?? '',
     })
   }, [editing, form, upsertOpen])
 
@@ -74,26 +74,18 @@ export function SupplierPage() {
     const q = query.trim().toLowerCase()
     if (!q) return items
     return items.filter((x) => {
-      const hay = `${x.customerCode} ${x.companyName} ${x.contact}`.toLowerCase()
+      const hay = `${x.name} ${x.phone} ${x.email}`.toLowerCase()
       return hay.includes(q)
     })
   }, [items, query])
 
-  async function onSubmit(data: SupplierFormValues) {
+  async function onSubmit(data: FormValues) {
     setSaving(true)
     try {
       if (editing) {
-        await updateSupplier(editing.id, {
-          customerCode: data.customerCode,
-          companyName: data.companyName,
-          contact: data.contact,
-        })
+        await updateCustomer(editing.id, { name: data.name, phone: data.phone, email: data.email })
       } else {
-        await createSupplier({
-          customerCode: data.customerCode,
-          companyName: data.companyName,
-          contact: data.contact,
-        })
+        await createCustomer({ name: data.name, phone: data.phone, email: data.email })
       }
       setUpsertOpen(false)
       setEditing(null)
@@ -106,7 +98,7 @@ export function SupplierPage() {
     if (!deleting) return
     setDeleteBusy(true)
     try {
-      await removeSupplier(deleting.id)
+      await removeCustomer(deleting.id)
       setDeleting(null)
     } finally {
       setDeleteBusy(false)
@@ -115,8 +107,8 @@ export function SupplierPage() {
 
   return (
     <PageShell
-      title="Supplier Definition"
-      description="Create suppliers to use in purchase orders and costing."
+      title="Customer Define"
+      description="Create customers to use in POS and customer ledger."
       actions={
         <Button
           type="button"
@@ -125,7 +117,7 @@ export function SupplierPage() {
             setUpsertOpen(true)
           }}
         >
-          Add Supplier
+          Add Customer
         </Button>
       }
     >
@@ -134,6 +126,7 @@ export function SupplierPage() {
           {error}
         </div>
       ) : null}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="sm:col-span-1">
           <CardContent className="pt-6">
@@ -142,7 +135,7 @@ export function SupplierPage() {
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Total suppliers</div>
+                <div className="text-xs text-muted-foreground">Total customers</div>
                 <div className="mt-1 text-2xl font-semibold">
                   {loading ? <Skeleton className="h-7 w-14" /> : items.length}
                 </div>
@@ -156,7 +149,7 @@ export function SupplierPage() {
               <div>
                 <div className="text-xs text-muted-foreground">Latest</div>
                 <div className="mt-1 text-sm font-semibold">
-                  {loading ? <Skeleton className="h-5 w-40" /> : latest ? latest.companyName : '—'}
+                  {loading ? <Skeleton className="h-5 w-40" /> : latest ? latest.name : '—'}
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {loading ? (
@@ -164,7 +157,7 @@ export function SupplierPage() {
                   ) : latest ? (
                     latest.createdAt || 'Just now'
                   ) : (
-                    'No suppliers added yet'
+                    'No customers added yet'
                   )}
                 </div>
               </div>
@@ -175,7 +168,7 @@ export function SupplierPage() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="pl-9"
-                    placeholder="Search suppliers"
+                    placeholder="Search customers"
                   />
                 </div>
               </div>
@@ -186,7 +179,7 @@ export function SupplierPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Suppliers</CardTitle>
+          <CardTitle>Customers</CardTitle>
           <CardDescription>Recently added appear on top.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -205,12 +198,10 @@ export function SupplierPage() {
                     <Users className="h-5 w-5 text-primary" />
                   </div>
                   <div className="mt-4 text-sm font-semibold">
-                    {items.length === 0 ? 'No suppliers yet' : 'No matches'}
+                    {items.length === 0 ? 'No customers yet' : 'No matches'}
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    {items.length === 0
-                      ? 'Add your first supplier to start purchase orders.'
-                      : 'Try a different search.'}
+                    {items.length === 0 ? 'Add your first customer to start POS.' : 'Try a different search.'}
                   </div>
                 </div>
               )
@@ -219,31 +210,23 @@ export function SupplierPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-[linear-gradient(180deg,hsl(0_72%_46%/1),hsl(0_72%_46%/0.88))] hover:bg-[linear-gradient(180deg,hsl(0_72%_46%/1),hsl(0_72%_46%/0.88))]">
-                  <TableHead className="text-primary-foreground">Company Code</TableHead>
-                  <TableHead className="text-primary-foreground">Company Name</TableHead>
-                  <TableHead className="text-primary-foreground">Contact</TableHead>
-                  <TableHead className="w-[88px] text-right text-primary-foreground">
-                    Action
-                  </TableHead>
+                  <TableHead className="text-primary-foreground">Name</TableHead>
+                  <TableHead className="text-primary-foreground">Phone</TableHead>
+                  <TableHead className="text-primary-foreground">Email</TableHead>
+                  <TableHead className="w-[88px] text-right text-primary-foreground">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((s) => (
-                  <TableRow key={s.id}>
+                {filtered.map((c) => (
+                  <TableRow key={c.id}>
                     <TableCell className="min-w-0">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{s.customerCode}</div>
-                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                          Added {s.createdAt}
-                        </div>
+                        <div className="truncate text-sm font-medium">{c.name}</div>
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">Added {c.createdAt}</div>
                       </div>
                     </TableCell>
-                    <TableCell className="min-w-0 truncate text-sm text-foreground/90">
-                      {s.companyName}
-                    </TableCell>
-                    <TableCell className="min-w-0 truncate text-sm text-foreground/90">
-                      {s.contact || '—'}
-                    </TableCell>
+                    <TableCell className="min-w-0 truncate text-sm text-foreground/90">{c.phone || '—'}</TableCell>
+                    <TableCell className="min-w-0 truncate text-sm text-foreground/90">{c.email || '—'}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -254,7 +237,7 @@ export function SupplierPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onSelect={() => {
-                              setEditing(s)
+                              setEditing(c)
                               setUpsertOpen(true)
                             }}
                           >
@@ -262,10 +245,7 @@ export function SupplierPage() {
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-primary"
-                            onSelect={() => setDeleting(s)}
-                          >
+                          <DropdownMenuItem className="text-primary" onSelect={() => setDeleting(c)}>
                             <Trash2 className="h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
@@ -290,59 +270,46 @@ export function SupplierPage() {
       >
         <DialogContent disableClose={saving}>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
-            <DialogDescription>
-              Customer code and company name will be used in purchase orders.
-            </DialogDescription>
+            <DialogTitle>{editing ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+            <DialogDescription>Customer will be used in POS and ledger.</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogBody>
               <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="supplier-code">Company Code</Label>
-                <Input
-                  id="supplier-code"
-                  placeholder="e.g. COMP-001"
-                  autoComplete="off"
-                  {...form.register('customerCode')}
-                />
-                {form.formState.errors.customerCode?.message ? (
-                  <div className="text-sm text-red-400">
-                    {form.formState.errors.customerCode.message}
-                  </div>
-                ) : null}
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-name">Customer name</Label>
+                  <Input id="customer-name" placeholder="e.g. Ali" autoComplete="name" {...form.register('name')} />
+                  {form.formState.errors.name?.message ? (
+                    <div className="text-sm text-red-400">{form.formState.errors.name.message}</div>
+                  ) : null}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="supplier-company">Company Name</Label>
-                <Input
-                  id="supplier-company"
-                  placeholder="e.g. ABC Traders"
-                  autoComplete="organization"
-                  {...form.register('companyName')}
-                />
-                {form.formState.errors.companyName?.message ? (
-                  <div className="text-sm text-red-400">
-                    {form.formState.errors.companyName.message}
-                  </div>
-                ) : null}
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-phone">Phone number</Label>
+                  <Input
+                    id="customer-phone"
+                    placeholder="e.g. 0300xxxxxxx"
+                    autoComplete="tel"
+                    {...form.register('phone')}
+                  />
+                  {form.formState.errors.phone?.message ? (
+                    <div className="text-sm text-red-400">{form.formState.errors.phone.message}</div>
+                  ) : null}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="supplier-contact">Contact</Label>
-                <Input
-                  id="supplier-contact"
-                  placeholder="Phone, email, or person name"
-                  autoComplete="tel"
-                  {...form.register('contact')}
-                />
-                {form.formState.errors.contact?.message ? (
-                  <div className="text-sm text-red-400">
-                    {form.formState.errors.contact.message}
-                  </div>
-                ) : null}
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-email">Email</Label>
+                  <Input
+                    id="customer-email"
+                    placeholder="e.g. name@example.com"
+                    autoComplete="email"
+                    {...form.register('email')}
+                  />
+                  {form.formState.errors.email?.message ? (
+                    <div className="text-sm text-red-400">{form.formState.errors.email.message}</div>
+                  ) : null}
+                </div>
               </div>
             </DialogBody>
 
@@ -359,7 +326,7 @@ export function SupplierPage() {
                 ) : editing ? (
                   'Save changes'
                 ) : (
-                  'Add Supplier'
+                  'Add Customer'
                 )}
               </Button>
             </DialogFooter>
@@ -372,12 +339,8 @@ export function SupplierPage() {
         onOpenChange={(open) => {
           if (!open) setDeleting(null)
         }}
-        title="Delete supplier?"
-        description={
-          deleting
-            ? `This will permanently delete “${deleting.companyName || deleting.customerCode}”.`
-            : undefined
-        }
+        title="Delete customer?"
+        description={deleting ? `This will permanently delete “${deleting.name}”.` : undefined}
         confirmLabel="Delete"
         confirmDanger
         busy={deleteBusy}

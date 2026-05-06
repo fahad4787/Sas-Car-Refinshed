@@ -20,9 +20,7 @@ export const zNonNegativeInput = z.preprocess(preprocessEmptyToZero, z.number().
 /** Qty must be > 0; empty → validation error. */
 export const zPositiveQtyInput = z.preprocess(
   preprocessEmptyToUndefined,
-  z
-    .number({ invalid_type_error: 'Qty (Kg) is required' })
-    .positive('Qty (Kg) is required'),
+  z.number().positive('Qty (Kg) is required'),
 )
 
 export const zVatPercentInput = z.preprocess(preprocessEmptyToZero, z.number().min(0).max(100))

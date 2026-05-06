@@ -1,7 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
-import { Outlet, createRouter, RootRoute, Route } from '@tanstack/react-router'
-
-import { HomePage } from '@/pages/Home'
+import { Navigate, Outlet, createRouter, RootRoute, Route } from '@tanstack/react-router'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
 import { DashboardHomePage } from '@/pages/Dashboard/Home'
 import { SupplierPage } from '@/pages/Dashboard/Suppliers'
@@ -10,6 +8,8 @@ import { PurchaseOrderEditPage, PurchaseOrderPage, PurchaseOrdersListPage } from
 import { ProductCostingsListPage } from '@/pages/Dashboard/ProductCosting/list'
 import { ProductCostingNewPage } from '@/pages/Dashboard/ProductCosting/new'
 import { ProductCostingEditPage } from '@/pages/Dashboard/ProductCosting/edit'
+import { CustomerPage } from '@/pages/Dashboard/Customers'
+import { StockReportPage } from '@/pages/Dashboard/StockReport'
 import { PlaceholderPage } from '@/pages/Dashboard/_components/PlaceholderPage'
 
 const rootRoute = new RootRoute({
@@ -23,7 +23,7 @@ const rootRoute = new RootRoute({
 const indexRoute = new Route({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: HomePage,
+  component: () => <Navigate to="/dashboard" replace />,
 })
 
 const dashboardRoute = new Route({
@@ -89,13 +89,13 @@ const productCostingEditRoute = new Route({
 const stockReportRoute = new Route({
   getParentRoute: () => dashboardRoute,
   path: '/stock-report',
-  component: () => <PlaceholderPage title="Stock Report" />,
+  component: StockReportPage,
 })
 
 const customersRoute = new Route({
   getParentRoute: () => dashboardRoute,
   path: '/customers',
-  component: () => <PlaceholderPage title="Customer Define" />,
+  component: CustomerPage,
 })
 
 const posRoute = new Route({

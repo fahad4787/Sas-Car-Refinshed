@@ -31,7 +31,7 @@ import { usePurchaseOrders } from '@/features/purchase-orders'
 import { useRawMaterials } from '@/features/raw-materials'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { formatDisplayAmount } from '@/lib/displayAmount'
+import { formatDisplayAmount, formatTruncatedQty } from '@/lib/displayAmount'
 import { zNonNegativeInput } from '@/lib/formZod'
 import { todayLocalISODate } from '@/lib/localDate'
 import { packUnitLabelForWeightKg } from '@/lib/weightPackUnit'
@@ -256,6 +256,8 @@ export function ProductCostingEditPage() {
         ? '—'
         : '0'
 
+  const totalCostBatch = computed.finalCostPerPiece * computed.producedAuto
+
   return (
     <PageShell
       title="Edit Product"
@@ -444,8 +446,12 @@ export function ProductCostingEditPage() {
                                         min={0}
                                         max={Number(line?.availableQty || 0)}
                                         step="0.0001"
+                                        placeholder="—"
                                         value={
-                                          (field.value as unknown) === '' || field.value === null || field.value === undefined
+                                          (field.value as unknown) === '' ||
+                                          field.value === null ||
+                                          field.value === undefined ||
+                                          Number(field.value) === 0
                                             ? ''
                                             : field.value
                                         }
@@ -460,23 +466,41 @@ export function ProductCostingEditPage() {
                                           const clamped = Math.max(0, Math.min(Number.isFinite(cap) ? cap : 0, Number.isFinite(next) ? next : 0))
                                           field.onChange(clamped)
                                         }}
-                                        onBlur={() => {
-                                          if ((field.value as unknown) === '') field.onChange(0)
-                                        }}
                                       />
                                     )}
                                   />
                                 </TableCell>
                                 <TableCell className="w-[86px] text-right text-sm">
-                                  <Badge shape="circle" variant="muted" className="ml-auto">
-                                    {Number(line?.availableQty || 0)}
+                                  <Badge
+                                    shape="pill"
+                                    variant="muted"
+                                    className="ml-auto max-w-[10rem] min-w-0 justify-end truncate px-2.5"
+                                    title={formatTruncatedQty(Number(line?.availableQty || 0))}
+                                  >
+                                    {formatTruncatedQty(Number(line?.availableQty || 0))}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="w-[110px]">
-                                  <Input type="number" min={0} step="0.0001" {...form.register(`lines.${idx}.rate`)} />
+                                  <Controller
+                                    control={form.control}
+                                    name={`lines.${idx}.rate`}
+                                    render={({ field }) => (
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        step="0.0001"
+                                        placeholder="—"
+                                        value={field.value === 0 ? '' : field.value}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          field.onChange(v === '' ? 0 : Number(v))
+                                        }}
+                                      />
+                                    )}
+                                  />
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
-                                  {money.format(Number.isFinite(line?.amount) ? line.amount : 0)}
+                                  {formatDisplayAmount(Number.isFinite(line?.amount) ? line.amount : 0)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button
@@ -496,11 +520,11 @@ export function ProductCostingEditPage() {
                           })}
                           <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
                             <TableCell>Total</TableCell>
-                            <TableCell className="tabular-nums">{qtyTotalFmt.format(computed.totalQty)}</TableCell>
+                            <TableCell className="tabular-nums">{formatDisplayAmount(computed.totalQty)}</TableCell>
                             <TableCell />
                             <TableCell />
                             <TableCell className="text-right tabular-nums">
-                              {money.format(computed.totalRawMaterialCost)}
+                              {formatDisplayAmount(computed.totalRawMaterialCost)}
                             </TableCell>
                             <TableCell />
                           </TableRow>
@@ -530,15 +554,63 @@ export function ProductCostingEditPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Empty tin</Label>
-                    <Input type="number" min={0} step="0.0001" {...form.register('emptyTin')} />
+                    <Controller
+                      control={form.control}
+                      name="emptyTin"
+                      render={({ field }) => (
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          placeholder="—"
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === '' ? 0 : Number(v))
+                          }}
+                        />
+                      )}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Carton + tape</Label>
-                    <Input type="number" min={0} step="0.0001" {...form.register('cartonTape')} />
+                    <Controller
+                      control={form.control}
+                      name="cartonTape"
+                      render={({ field }) => (
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          placeholder="—"
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === '' ? 0 : Number(v))
+                          }}
+                        />
+                      )}
+                    />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Labour</Label>
-                    <Input type="number" min={0} step="0.0001" {...form.register('labour')} />
+                    <Controller
+                      control={form.control}
+                      name="labour"
+                      render={({ field }) => (
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          placeholder="—"
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            field.onChange(v === '' ? 0 : Number(v))
+                          }}
+                        />
+                      )}
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -566,7 +638,7 @@ export function ProductCostingEditPage() {
                         {wKg > 0 ? (
                           <>
                             <span>
-                              {wKg} <span className="text-muted-foreground">kg</span>
+                              {formatDisplayAmount(wKg)} <span className="text-muted-foreground">kg</span>
                             </span>
                             {packUnit ? (
                               <Badge variant="muted">{packUnit}</Badge>
@@ -582,16 +654,22 @@ export function ProductCostingEditPage() {
                     <div className="my-2 h-px bg-border" />
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-muted-foreground">Cost per piece</div>
-                      <div className="tabular-nums font-medium">{money.format(computed.materialCostPerPiece)}</div>
+                      <div className="tabular-nums font-medium">{formatDisplayAmount(computed.materialCostPerPiece)}</div>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-muted-foreground">Tin, packing, labour</div>
-                      <div className="tabular-nums font-medium">{money.format(computed.otherPerPiece)}</div>
+                      <div className="tabular-nums font-medium">{formatDisplayAmount(computed.otherPerPiece)}</div>
                     </div>
                     <div className="my-2 h-px bg-border" />
                     <div className="flex items-center justify-between gap-x-4 gap-y-1">
-                      <div className="text-base font-semibold">Total cost</div>
-                      <div className="text-base font-semibold tabular-nums">{money.format(computed.finalCostPerPiece)}</div>
+                      <div className="text-base font-semibold">Total cost (per piece)</div>
+                      <div className="text-base font-semibold tabular-nums">
+                        {formatDisplayAmount(computed.finalCostPerPiece)}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-x-4 gap-y-1">
+                      <div className="text-muted-foreground">Total cost (batch)</div>
+                      <div className="tabular-nums font-semibold">{formatDisplayAmount(totalCostBatch)}</div>
                     </div>
                   </div>
                 </div>

@@ -334,7 +334,7 @@ export function PurchaseOrderEditPage() {
                                         min={0}
                                         step="0.01"
                                         placeholder="—"
-                                        value={field.value == null || field.value === '' ? '' : field.value}
+                                        value={field.value == null ? '' : field.value}
                                         onChange={(e) => {
                                           const v = e.target.value
                                           field.onChange(v === '' ? (undefined as unknown as number) : Number(v))

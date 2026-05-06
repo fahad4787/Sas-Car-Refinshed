@@ -1,5 +1,5 @@
 import { useRouterState } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui'
@@ -20,14 +20,25 @@ const titleByPrefix: Array<{ prefix: string; title: string; subtitle?: string }>
 export function DashboardHeader({
   onToggleSidebar,
   sidebarCollapsed,
+  mobileMenuOpen,
 }: {
   onToggleSidebar: () => void
   sidebarCollapsed: boolean
+  mobileMenuOpen: boolean
 }) {
   const location = useRouterState({ select: (s) => s.location })
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isLg, setIsLg] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const apply = () => setIsLg(mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
 
   const meta = useMemo(() => {
     const found = titleByPrefix.find((x) =>
@@ -75,14 +86,26 @@ export function DashboardHeader({
             scrolled &&
               'border-white/15 bg-white/10 text-white hover:bg-white/14 hover:text-white',
           )}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!isLg ? mobileMenuOpen : undefined}
+          aria-label={
+            isLg
+              ? sidebarCollapsed
+                ? 'Expand sidebar'
+                : 'Collapse sidebar'
+              : mobileMenuOpen
+                ? 'Close menu'
+                : 'Open menu'
+          }
           onClick={onToggleSidebar}
         >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
+          <span className="lg:hidden">{mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</span>
+          <span className="hidden lg:inline">
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </span>
         </Button>
 
         <div className="min-w-0">

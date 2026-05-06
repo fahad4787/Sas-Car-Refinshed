@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { Boxes, Loader2, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { Resolver } from 'react-hook-form'
 import { useForm } from 'react-hook-form'
@@ -47,6 +47,7 @@ import {
 } from '@/features/raw-materials'
 import { usePurchaseOrders } from '@/features/purchase-orders'
 import { useProductCostings } from '@/features/product-costing'
+import { formatDisplayAmount, formatTruncatedQty } from '@/lib/displayAmount'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 
 const schema = z.object({
@@ -135,15 +136,6 @@ export function RawMaterialPage() {
     return out
   }, [productCostings, purchaseOrders])
 
-  const money = useMemo(
-    () =>
-      new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    [],
-  )
-
   async function onSubmit(values: FormValues) {
     setSaving(true)
     try {
@@ -203,9 +195,16 @@ export function RawMaterialPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="sm:col-span-1">
           <CardContent className="pt-6">
-            <div className="text-xs text-muted-foreground">Total items</div>
-            <div className="mt-2 text-2xl font-semibold">
-              {loading ? <Skeleton className="h-7 w-14" /> : items.length}
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl border border-border bg-surface-2 p-3">
+                <Boxes className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Total items</div>
+                <div className="mt-1 text-2xl font-semibold">
+                  {loading ? <Skeleton className="h-7 w-14" /> : items.length}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -284,13 +283,18 @@ export function RawMaterialPage() {
                       {rm.description || '—'}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      <Badge shape="circle" variant="muted" className="ml-auto">
-                        {Number(materialStatsById.get(rm.id)?.availableQty ?? 0)}
+                      <Badge
+                        shape="pill"
+                        variant="muted"
+                        className="ml-auto max-w-[10rem] min-w-0 justify-end truncate px-2.5"
+                        title={formatTruncatedQty(Number(materialStatsById.get(rm.id)?.availableQty ?? 0))}
+                      >
+                        {formatTruncatedQty(Number(materialStatsById.get(rm.id)?.availableQty ?? 0))}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
                       {materialStatsById.get(rm.id)?.avgRate
-                        ? money.format(materialStatsById.get(rm.id)?.avgRate ?? 0)
+                        ? formatDisplayAmount(materialStatsById.get(rm.id)?.avgRate ?? 0)
                         : '—'}
                     </TableCell>
                     <TableCell className="text-right">

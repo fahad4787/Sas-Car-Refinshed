@@ -5,6 +5,7 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Date
 import type { DateRange } from '@/components/ui/date-range-picker'
 import { removePurchaseOrder, usePurchaseOrders } from '@/features/purchase-orders'
 import { useRawMaterials } from '@/features/raw-materials'
+import { formatDisplayAmount } from '@/lib/displayAmount'
 import { PageShell } from '@/pages/Dashboard/_components/PageShell'
 import { Link } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2 } from 'lucide-react'
@@ -33,15 +34,6 @@ export function PurchaseOrdersListPage() {
     for (const rm of rawMaterials) map.set(rm.id, rm.unit || '')
     return map
   }, [rawMaterials])
-
-  const money = useMemo(
-    () =>
-      new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    [],
-  )
 
   const filtered = useMemo(() => {
     const from = range.from ? new Date(range.from) : null
@@ -153,7 +145,7 @@ export function PurchaseOrdersListPage() {
                                 </button>
                               </TableCell>
                               <TableCell className="text-right tabular-nums font-semibold">
-                                {money.format(po.grossAmount || 0)}
+                                {formatDisplayAmount(po.grossAmount || 0)}
                               </TableCell>
                               <TableCell className="text-right">
                                 <DropdownMenu>
@@ -213,16 +205,16 @@ export function PurchaseOrdersListPage() {
                                                   </div>
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums text-sm">
-                                                  {Number(it.qty || 0)}
+                                                  {formatDisplayAmount(Number(it.qty || 0))}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm">
                                                   {unitByMaterialId.get((it as { rawMaterialId?: string }).rawMaterialId ?? '') || '—'}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums text-sm">
-                                                  {money.format(Number(it.rate || 0))}
+                                                  {formatDisplayAmount(Number(it.rate || 0))}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums text-sm font-semibold">
-                                                  {money.format(Number(it.amount || 0))}
+                                                  {formatDisplayAmount(Number(it.amount || 0))}
                                                 </TableCell>
                                               </TableRow>
                                             ))}
@@ -237,20 +229,20 @@ export function PurchaseOrdersListPage() {
                                         <div className="flex items-center justify-between gap-4">
                                           <div className="text-muted-foreground">Subtotal</div>
                                           <div className="tabular-nums font-semibold">
-                                            {money.format(po.totalAmount || 0)}
+                                            {formatDisplayAmount(po.totalAmount || 0)}
                                           </div>
                                         </div>
                                         <div className="flex items-center justify-between gap-4">
                                           <div className="text-muted-foreground">VAT ({Number(po.vatPercent || 0)}%)</div>
                                           <div className="tabular-nums font-semibold">
-                                            {money.format(po.vatAmount || 0)}
+                                            {formatDisplayAmount(po.vatAmount || 0)}
                                           </div>
                                         </div>
                                         <div className="my-2 h-px bg-border" />
                                         <div className="flex items-center justify-between gap-4">
                                           <div className="text-base font-semibold">Gross</div>
                                           <div className="tabular-nums text-base font-semibold">
-                                            {money.format(po.grossAmount || 0)}
+                                            {formatDisplayAmount(po.grossAmount || 0)}
                                           </div>
                                         </div>
                                       </div>
